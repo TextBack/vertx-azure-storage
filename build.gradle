@@ -1,0 +1,119 @@
+plugins {
+    id "java"
+    id "maven-publish"
+    id "com.jfrog.bintray" version "1.7"
+}
+
+apply(plugin: io.textback.gradle.VersionPlugin)
+apply(plugin: io.textback.gradle.BuildInfoPlugin)
+
+
+task annotationProcessing(type: JavaCompile, group: "build") {
+    source = sourceSets.main.java
+    classpath = configurations.compile + configurations.compileOnly
+    destinationDir = project.file("build/generated")
+    options.compilerArgs = [
+            "-proc:only",
+            "-processor", "io.vertx.codegen.CodeGenProcessor",
+            "-AoutputDirectory=${project.projectDir}/build"
+    ]
+}
+
+compileJava {
+    options.encoding = "UTF-8"
+    dependsOn(annotationProcessing)
+    sourceCompatibility = JavaVersion.VERSION_1_8
+    targetCompatibility = JavaVersion.VERSION_1_8
+}
+
+dependencies {
+    compile("io.vertx:vertx-core:$vertxVersion")
+
+    compileOnly("org.slf4j:slf4j-api:$slf4jVersion")
+    compileOnly("io.vertx:vertx-web:$vertxVersion")
+    compileOnly("io.vertx:vertx-rx-java:$vertxVersion")
+    compileOnly("io.vertx:vertx-codegen:$vertxVersion")
+    compileOnly("org.projectlombok:lombok:$lombokVersion")
+    compileOnly("org.slf4j:slf4j-api:$slf4jVersion")
+
+    testCompile("junit:junit:$junitVersion")
+    testCompile("io.vertx:vertx-unit:$vertxVersion")
+    testCompile("io.vertx:vertx-rx-java:$vertxVersion")
+    testCompile("ch.qos.logback:logback-classic:1.1.6")
+}
+
+
+
+repositories {
+    mavenCentral()
+    jcenter()
+}
+
+
+jar {
+    manifest {
+        attributes(
+                "Archiver-Version": "Gradle ${gradle.gradleVersion}",
+                "Created-By": "Gradle",
+                "Built-By": System.getProperty("user.name"),
+                "Built-Jdk": System.getProperty("java.version"),
+                "X-Component-Id": project.name,
+                "X-Component-Version": version,
+        )
+    }
+}
+
+
+
+sourceSets {
+    main {
+        java {
+            srcDirs += "build/generated"
+        }
+    }
+}
+
+task sourcesJar(type: Jar, dependsOn: classes) {
+    classifier = 'sources'
+    from(sourceSets.main.allSource)
+}
+
+task javadocJar(type: Jar, dependsOn: javadoc) {
+    classifier = 'javadoc'
+    from(javadoc.destinationDir)
+}
+
+artifacts {
+    archives(sourcesJar, javadocJar)
+}
+
+publishing {
+    publications {
+        maven(MavenPublication) {
+            from(components.java)
+            artifact(sourcesJar)
+            artifact(javadocJar)
+        }
+    }
+}
+
+bintray {
+    user = System.getenv("bintray_user")
+    key = System.getenv("bintray_api_key")
+    publish = true
+    pkg {
+        publications = ["maven"]
+        repo = "maven"
+        userOrg = "textback"
+        name = project.name
+        desc = project.description
+        websiteUrl = "https://github.com/TextBack/vertx-azure-storage"
+        vcsUrl = "https://github.com/TextBack/vertx-azure-storage"
+        licenses = ["Apache-2.0"]
+        publicDownloadNumbers = true
+    }
+}
+
+task wrapper(type: Wrapper) {
+    gradleVersion = '3.4.1'
+}
